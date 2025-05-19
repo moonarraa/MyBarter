@@ -3,6 +3,8 @@ from .models import Ad, ExchangeProposal
 
 
 class AdSerializer(serializers.ModelSerializer):
+    user = serializers.ReadOnlyField(source='user.username')
+
     class Meta:
         model = Ad
         fields = [
@@ -25,6 +27,17 @@ class AdSerializer(serializers.ModelSerializer):
             return super().create(validated_data)
 
 
+        def validate_title(self, title):
+            if not title.strip():
+                raise serializers.ValidationError("Title is required")
+            return title
+
+        def validate_description(self, description):
+            if not description.strip():
+                raise serializers.ValidationError("Description is required")
+            return description
+
+
 class ProposalSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExchangeProposal
@@ -42,3 +55,16 @@ class ProposalSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data["status"] = ExchangeProposal.status.PENDING
         return super().create(validated_data)
+
+
+    def validate(self, data):
+        ad_sender = getattr(data, 'ad_sender')
+        ad_receiver = getattr(data, 'ad_receiver')
+        user = self.context['request'].user
+        if ad_sender.user != user:
+            raise serializers.ValidationError("You are not the owner of the ad")
+        if ad_sender == ad_receiver:
+            raise serializers.ValidationError("You can't exchange the same ad")
+        return data
+
+
